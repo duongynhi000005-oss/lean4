@@ -236,8 +236,10 @@ def parseMethod : Parser Method :=
   <|> (attempt <| skipBytes "UNCHECKOUT".toUTF8 <&> fun _ => Method.uncheckout)
   <|> (attempt <| skipBytes "UNLINK".toUTF8 <&> fun _ => Method.unlink)
   <|> (attempt <| skipBytes "UNLOCK".toUTF8 <&> fun _ => Method.unlock)
-  <|> (attempt <| skipBytes "UPDATEREDIRECTREF".toUTF8 <&> fun _ => Method.updateredirectref)
-  <|> (attempt <| skipBytes "UPDATE".toUTF8 <&> fun _ => Method.update)
+  <|> (fun it => match (skipBytes "UPDATEREDIRECTREF".toUTF8 <&> fun _ => Method.updateredirectref) it with
+    | .success rem res => .success rem res
+    | .error rem .eof => .error rem .eof
+    | .error _ _ => (attempt <| skipBytes "UPDATE".toUTF8 <&> fun _ => Method.update) it)
   <|> (attempt <| skipBytes "VERSION-CONTROL".toUTF8 <&> fun _ => Method.versionControl)
   <|> (parseToken 64 *> fail "unrecognized method")
 
