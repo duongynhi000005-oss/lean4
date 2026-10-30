@@ -922,8 +922,11 @@ class task_manager {
             // another thread could deactivate the task and empty `m_clousure` in
             // between.
             object * c = imp->m_closure;
+            object * inner = closure_arg_cptr(c)[0];
+            lean_inc(inner);
             lock.unlock();
-            add_dep(lean_to_task(closure_arg_cptr(c)[0]), t);
+            add_dep(lean_to_task(inner), t);
+            lean_dec(inner);
             lock.lock();
         }
     }
@@ -1269,7 +1272,15 @@ static obj_res task_bind_fn1(obj_arg x, obj_arg f, obj_arg) {
         lean_assert(imp->m_closure == nullptr);
         obj_res c = mk_closure_2_1(task_bind_fn2, new_task);
         mark_mt(c);
-        imp->m_closure = c;
+        {
+            unique_lock<mutex> lock(g_task_manager->m_mutex);
+            if (imp->m_deleted) {
+                lock.unlock();
+                lean_dec_ref(c);
+            } else {
+                imp->m_closure = c;
+            }
+        }
         return nullptr; /* notify queue that task did not finish yet. */
     }
 }
